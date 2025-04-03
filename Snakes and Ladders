@@ -1,1 +1,185 @@
+import random  # importing the random module
 
+GRID_WIDTH = 8  # width of the grid
+GRID_HEIGHT = 3  # height of the grid
+DICE_SIDES = 6  # number of sides on the dice
+PLAYER_SYMBOL = 'P'  # symbol representing the player
+
+
+def generate_random_map(length, the_seed=0):
+    """
+    generate a randomly generated map based on a specific seed and length.
+    :param length: the length of the map.
+    :param the_seed: the seed of the map. Defaults to 0 if not provided.
+    :return: a randomly generated map based on the specified seed and length.
+    """
+    if the_seed:  # checking if a seed is provided
+        random.seed(the_seed)  # setting the random seed
+    map_list = []  # initializing an empty list to store map elements
+    for _ in range(length - 2):  # loop to generate map elements
+        random_points = random.randint(1, 100)  # generating random points
+        random_position = random.randint(0, length - 1)  # generating random position
+        # choosing a random instruction with given weights and appending to map_list
+        map_list.append(random.choices(
+            ['nop', f'add {random_points}', f'sub {random_points}', f'mul {random_points}', f'jmp '
+                f' {random_position}', 'hlt'], weights=[5, 2, 2, 2, 3, 1], k=1)[0])
+
+    return ['nop'] + map_list + ['hlt']  # returning the generated map with nop at the start and hlt at the end
+
+
+def make_grid(table_size):
+    """
+    make a display grid that you can then modify with fill_grid_square (it's a 2d-grid of characters).
+    :param table_size: the size of the grid.
+    :return: a 2D grid filled with '*' representing borders and ' ' representing empty squares.
+    """
+    # calculating dimensions of the grid
+    floating_square_root = table_size ** (1 / 2)
+    int_square_root = int(floating_square_root) + (1 if floating_square_root % 1 else 0)
+    table_height = int_square_root
+    if int_square_root * (int_square_root - 1) >= table_size:
+        table_height -= 1
+
+    # creating a 2D grid filled with '*' representing borders and ' ' representing empty squares
+    the_display_grid = [[' ' if j % GRID_WIDTH else '*' for j in range(GRID_WIDTH * int_square_root + 1)]
+                        if i % GRID_HEIGHT else ['*' for j in range(GRID_WIDTH * int_square_root + 1)]
+                        for i in range(table_height * GRID_HEIGHT + 1)]
+
+    # adding position numbers on the squares
+    position = 0  # initializing position counter
+    for i in range(table_height * GRID_HEIGHT):  # looping through grid rows
+        for j in range(GRID_WIDTH * int_square_root):  # looping through grid columns
+            if j % GRID_WIDTH == 0 and i % GRID_HEIGHT == 0:  # checking if it's a corner position
+                position += 1  # incrementing position counter
+                the_display_grid[i][j] = str(position)  # setting position number on the square
+
+    return the_display_grid  # returning the grid
+
+
+def fill_grid_square(display_grid, size, index, message):
+    """
+    fill a square on the grid with a given message.
+    :param display_grid: the grid to modify.
+    :param size: the size of the grid.
+    :param index: the index of the square to fill.
+    :param message: the message to fill in the square.
+    :return: none
+    """
+    # calculating grid dimensions
+    floating_square_root = size ** (1 / 2)
+    int_square_root = int(floating_square_root) + (1 if floating_square_root % 1 else 0)
+    table_row = index // int_square_root
+    table_col = index % int_square_root
+
+    # calculating column start based on row parity
+    if table_row % 2 == 0:
+        column_start = GRID_WIDTH * table_col
+    else:
+        column_start = GRID_WIDTH * (int_square_root - table_col - 1)
+
+    # filling grid square with message
+    for r, message_line in enumerate(message.split('\n')):  # looping through message lines
+        for k, c in enumerate(message_line):  # looping through characters in each line
+            display_grid[GRID_HEIGHT * table_row + 1 + r][column_start + 1 + k] = c  # setting character
+
+
+def roll_dice():
+    """
+    roll the dice once per turn.
+
+    :return: the result of the dice roll.
+    """
+    return random.randint(1, DICE_SIDES)  # returning a random number representing the dice roll
+
+
+def move_player(current_position, roll, map_size, game_map):
+    """
+    move the player based on the dice roll and the instructions on the current square.
+
+    :param current_position: the current position of the player.
+    :param roll: the result of the dice roll.
+    :param map_size: the size of the game map.
+    :param game_map: the game map containing instructions.
+    :return: the new position of the player after moving.
+    """
+    # calculating new position while ensuring not to go beyond the board
+    new_position = min(current_position + roll, map_size - 1)
+    instruction = game_map[new_position]  # getting instruction at the new position
+    if instruction.startswith('jmp'):  # checking if it's a jump instruction
+        new_position = int(instruction.split()[1])  # setting new position to jump target
+    return new_position  # returning new position
+
+
+def print_grid(display_grid):
+    """
+    print the grid.
+    :param display_grid: the grid to print.
+    :return: none
+    """
+    for row in display_grid:  # looping through each row in the grid
+        print(''.join(row))  # printing the row as a string
+
+
+def play_game():
+    """
+    play the game.
+
+    :return: none
+    """
+    # prompt the user for board size and seed
+    input_str = input("Board Size and Seed: ")  # getting input from user
+    split_input = input_str.split()  # splitting input string into list of strings
+    board_size = int(split_input[0])  # converting first string to integer representing board size
+    seed = int(split_input[1])  # converting second string to integer representing seed
+
+    # generate random map based on input size and seed
+    random_map = generate_random_map(board_size, seed)
+
+    # make grid based on map size
+    display_grid = make_grid(board_size)
+
+    # fill grid with map information
+    index = 0  # initializing index for iterating through random_map
+    while index < len(random_map):  # looping through random_map
+        message = random_map[index]  # getting message at current index
+        fill_grid_square(display_grid, board_size, index, message)  # filling grid square with message
+        index += 1  # incrementing index
+
+    # initialize player position and score
+    player_position = 0
+    score = 0
+
+    # print initial grid
+    print_grid(display_grid)
+
+    # main game loop
+    game_finished = False  # variable to track game completion
+    while not game_finished:  # loop until game is finished
+        # roll the dice
+        roll = roll_dice()  # rolling the dice
+
+        # move the player
+        player_position = move_player(player_position, roll, board_size, random_map)  # moving the player
+
+        # update score based on instruction
+        instruction = random_map[player_position]  # getting instruction at current player position
+        if instruction.startswith('add'):  # checking if it's an add instruction
+            score += int(instruction.split()[1])  # adding points to the score
+        elif instruction.startswith('sub'):  # checking if it's a subtract instruction
+            score -= int(instruction.split()[1])  # subtracting points from the score
+        elif instruction.startswith('mul'):  # checking if it's a multiply instruction
+            score *= int(instruction.split()[1])  # multiplying points with the score
+
+        # print player information
+        print(f"Pos: {player_position} Score: {score}, instruction {instruction} Rolled: {roll}")
+
+        # check for win condition
+        # checking if player reached the end or hlt instruction encountered
+        if player_position == board_size - 1 or instruction == 'hlt':
+            # printing final position and score
+            print(f"Final Pos: {player_position} Final Score: {score}, Instruction {instruction}")
+            game_finished = True  # setting game_finished to True to exit the loop
+
+
+if __name__ == "__main__":
+    play_game()  # calling play_game function if the script is run directly
